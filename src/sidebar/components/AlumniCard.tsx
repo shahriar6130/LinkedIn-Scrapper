@@ -1,8 +1,8 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { X, ExternalLink, GraduationCap } from "lucide-react";
-import type { Alumni } from "@/sidebar/lib/constants";
-import { truncate } from "@/sidebar/lib/utils";
+import type { Alumni } from "@/shared/types";
+import { truncate } from "@/sidebar/utils";
 
 interface AlumniCardProps {
   alumni: Alumni;

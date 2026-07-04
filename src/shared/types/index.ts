@@ -1,10 +1,3 @@
-export const SIDEBAR_WIDTH = 380;
-export const SIDEBAR_COLLAPSED_WIDTH = 52;
-export const STORAGE_KEY = "alumni_leads";
-export const SIDEBAR_WIDTH = 380;
-export const SIDEBAR_COLLAPSED_WIDTH = 52;
-export const STORAGE_KEY = "alumni_leads";
-
 export interface Alumni {
   name: string;
   designation: string;
@@ -30,4 +23,8 @@ export interface ProfileData {
   educationTimeline: string;
   profilePicture: string;
   connectionDegree: string;
+}
+
+export interface ScrapeResult extends ProfileData {
+  error?: string;
 }

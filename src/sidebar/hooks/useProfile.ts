@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { ProfileData } from "@/sidebar/lib/constants";
+import type { ProfileData } from "@/shared/types";
 
 export function useProfile() {
   const [profile, setProfile] = useState<ProfileData | null>(null);

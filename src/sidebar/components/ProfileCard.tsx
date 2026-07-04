@@ -1,8 +1,8 @@
 import React from "react";
 import { MapPin, Building2, GraduationCap, ExternalLink, RefreshCw } from "lucide-react";
 import { ProfileCardSkeleton } from "@/sidebar/components/ProfileCardSkeleton";
-import type { ProfileData } from "@/sidebar/lib/constants";
-import { truncate } from "@/sidebar/lib/utils";
+import type { ProfileData } from "@/shared/types";
+import { truncate } from "@/sidebar/utils";
 
 interface ProfileCardProps {
   profile: ProfileData | null;

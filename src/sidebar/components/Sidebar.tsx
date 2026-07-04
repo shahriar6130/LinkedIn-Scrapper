@@ -9,7 +9,7 @@ import { AlumniList } from "@/sidebar/components/AlumniList";
 import { ExportCard } from "@/sidebar/components/ExportCard";
 import { RecentActivity } from "@/sidebar/components/RecentActivity";
 import { Toast } from "@/sidebar/components/Toast";
-import { exportCSV, exportExcel } from "@/sidebar/lib/utils";
+import { exportCSV, exportExcel } from "@/sidebar/services/export";
 import type { useProfile } from "@/sidebar/hooks/useProfile";
 import type { useAlumni } from "@/sidebar/hooks/useAlumni";
 

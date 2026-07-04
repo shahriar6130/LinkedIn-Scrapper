@@ -1,4 +1,4 @@
-import type { Alumni } from "./constants";
+import type { Alumni } from "@/shared/types";
 
 export function exportCSV(leads: Alumni[]) {
   const headers = [
@@ -66,20 +66,4 @@ function downloadBlob(blob: Blob, filename: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-export function truncate(str: string, max: number): string {
-  if (!str) return "";
-  return str.length > max ? str.substring(0, max) + "..." : str;
-}
-
-export function timeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return "Just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }

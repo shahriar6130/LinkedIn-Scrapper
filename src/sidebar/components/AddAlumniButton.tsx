@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { UserPlus, Check, Loader2 } from "lucide-react";
-import type { ProfileData } from "@/sidebar/lib/constants";
+import type { ProfileData } from "@/shared/types";
 
 interface AddAlumniButtonProps {
   profile: ProfileData | null;
