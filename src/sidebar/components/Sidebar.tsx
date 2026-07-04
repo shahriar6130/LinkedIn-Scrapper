@@ -42,7 +42,22 @@ export function Sidebar({
 
   const handleAddAlumni = () => {
     if (!profile.profile) return;
-    const success = alumni.addAlumni(profile.profile);
+    const p = profile.profile;
+    const success = alumni.addAlumni({
+      name: p.name,
+      designation: p.designation,
+      companyName: p.companyName,
+      profileLink: p.profileLink,
+      location: p.location,
+      educationInstitute: p.educationInstitute,
+      degree: p.degree,
+      educationTimeline: p.educationTimeline,
+      profilePicture: p.profilePicture,
+      connectionDegree: p.connectionDegree,
+      about: p.about ?? "",
+      skills: JSON.stringify(p.skills ?? []),
+      industry: p.industry ?? "",
+    });
     if (success) {
       showToast(`${profile.profile.name} added!`, "success");
     } else {
