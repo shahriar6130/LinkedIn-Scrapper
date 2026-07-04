@@ -10,6 +10,7 @@ export interface Profile {
   location: string;
   education: Education | null;
   profilePicture: string;
+  hostedPicture: string;
   connectionDegree: string;
   about: string;
   skills: Skill[];
@@ -27,6 +28,7 @@ export interface ProfileScrapeResult {
   degree: string;
   educationTimeline: string;
   profilePicture: string;
+  hostedPicture?: string;
   connectionDegree: string;
   about: string;
   skills: string[];

@@ -1,4 +1,5 @@
 import type { Alumni, Profile, ProfileScrapeResult } from "@/models";
+import type { ImagePipelineResult } from "@/services/image-providers/types";
 
 export interface ILoggerService {
   info(tag: string, message: string, data?: unknown): void;
@@ -23,6 +24,10 @@ export interface IScraperService {
 export interface IProfileService {
   toProfile(result: ProfileScrapeResult): Profile | null;
   toAlumni(profile: Profile): Alumni;
+}
+
+export interface IImagePipelineService {
+  processImage(linkedinUrl: string): Promise<ImagePipelineResult>;
 }
 
 export interface IMessageBus {

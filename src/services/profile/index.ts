@@ -30,6 +30,7 @@ export class ProfileService implements IProfileService {
             }
           : null,
       profilePicture: result.profilePicture,
+      hostedPicture: result.hostedPicture ?? "",
       connectionDegree: result.connectionDegree,
       about: result.about ?? "",
       skills: (result.skills ?? []).map((s) => ({ name: s })),
@@ -51,6 +52,7 @@ export class ProfileService implements IProfileService {
       degree: profile.education?.degree ?? "",
       educationTimeline: profile.education?.timeline ?? "",
       profilePicture: profile.profilePicture,
+      hostedPicture: profile.hostedPicture ?? "",
       connectionDegree: profile.connectionDegree,
       about: profile.about ?? "",
       skills: JSON.stringify(profile.skills?.map((s) => s.name) ?? []),

@@ -5,12 +5,15 @@ import type {
   IExportService,
   IScraperService,
   IProfileService,
+  IImagePipelineService,
 } from "@/services/interfaces";
 import { LoggerService } from "@/services/logger";
 import { StorageService } from "@/services/storage";
 import { ExportService } from "@/services/export";
 import { ScraperService } from "@/services/scraper";
 import { ProfileService } from "@/services/profile";
+import { createImageProviders } from "@/services/image-providers";
+import { ImagePipelineService } from "@/services/image-pipeline";
 
 export interface ServiceContainer {
   logger: ILoggerService;
@@ -18,6 +21,7 @@ export interface ServiceContainer {
   export: IExportService;
   scraper: IScraperService;
   profile: IProfileService;
+  imagePipeline: IImagePipelineService | null;
 }
 
 const ServiceContext = createContext<ServiceContainer | null>(null);
@@ -26,12 +30,14 @@ const ServiceContext = createContext<ServiceContainer | null>(null);
  * Build the default service container with production implementations.
  */
 function createDefaultContainer(): ServiceContainer {
+  const providers = createImageProviders();
   return {
     logger: new LoggerService(),
     storage: new StorageService(),
     export: new ExportService(),
     scraper: new ScraperService(),
     profile: new ProfileService(),
+    imagePipeline: providers.length > 0 ? new ImagePipelineService(providers) : null,
   };
 }
 

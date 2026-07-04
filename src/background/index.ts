@@ -2,6 +2,8 @@ import { MessageType } from "@/messaging";
 import { LoggerService } from "@/services/logger";
 import { buildProfileScraper } from "@/scraping/orchestrator";
 import { buildPageLoader } from "@/scraping/page-loader";
+import { createImageProviders } from "@/services/image-providers";
+import { ImagePipelineService } from "@/services/image-pipeline";
 
 const logger = new LoggerService();
 const TAG = "BG";
@@ -90,7 +92,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (result?.timing) {
             logger.info(TAG, `Scrape completed in ${result.timing.toFixed(1)}ms`);
           }
-          sendResponse(result ?? { error: "No result from scraping" });
+
+          // Step 3: Run image pipeline if providers are configured
+          const providers = createImageProviders();
+          if (providers.length > 0 && result?.profilePicture) {
+            logger.info(TAG, `Image pipeline: providers = ${providers.map((p) => p.name).join(", ")}`);
+            const pipeline = new ImagePipelineService(providers);
+            return pipeline.processImage(result.profilePicture).then((pipelineResult) => {
+              result.hostedPicture = pipelineResult.hostedUrl;
+              if (pipelineResult.warnings.length) {
+                logger.info(TAG, "Image pipeline:", pipelineResult.warnings);
+              }
+              if (pipelineResult.hostedUrl) {
+                logger.info(TAG, `Image hosted via ${pipelineResult.provider}: ${pipelineResult.hostedUrl}`);
+              }
+              return result;
+            });
+          }
+
+          return result;
+        })
+        .then((finalResult) => {
+          sendResponse(finalResult ?? { error: "No result from scraping" });
         })
         .catch((err) => {
           logger.error(TAG, "Script injection failed:", err);

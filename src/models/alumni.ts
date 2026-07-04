@@ -9,6 +9,7 @@ export interface Alumni {
   degree: string;
   educationTimeline: string;
   profilePicture: string;
+  hostedPicture: string;
   connectionDegree: string;
   about: string;
   skills: string;

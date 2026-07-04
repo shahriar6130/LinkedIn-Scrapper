@@ -53,6 +53,7 @@ export function Sidebar({
       degree: p.degree,
       educationTimeline: p.educationTimeline,
       profilePicture: p.profilePicture,
+      hostedPicture: p.hostedPicture ?? "",
       connectionDegree: p.connectionDegree,
       about: p.about ?? "",
       skills: JSON.stringify(p.skills ?? []),

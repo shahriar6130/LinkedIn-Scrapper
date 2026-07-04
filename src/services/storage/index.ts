@@ -53,6 +53,7 @@ export class StorageService implements IStorageService {
           degree: (lead.degree as string) ?? "",
           educationTimeline: (lead.educationTimeline as string) ?? "",
           profilePicture: (lead.profilePicture as string) ?? "",
+          hostedPicture: (lead.hostedPicture as string) ?? "",
           connectionDegree: (lead.connectionDegree as string) ?? "",
           about: (lead.about as string) ?? "",
           skills: (lead.skills as string) ?? "",
