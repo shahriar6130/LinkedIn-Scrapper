@@ -1,7 +1,7 @@
 import React from "react";
 import { Clock } from "lucide-react";
-import type { Alumni } from "@/shared/types";
-import { timeAgo, truncate } from "@/sidebar/utils";
+import type { Alumni } from "@/models";
+import { timeAgo, truncate } from "@/utils";
 
 interface RecentActivityProps {
   alumni: Alumni[];

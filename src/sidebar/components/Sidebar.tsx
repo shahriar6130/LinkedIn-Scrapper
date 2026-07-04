@@ -1,6 +1,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from "@/sidebar/lib/constants";
+import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from "@/core/constants";
+import { useServices } from "@/core/container";
 import { SidebarHeader } from "@/sidebar/components/SidebarHeader";
 import { ProfileCard } from "@/sidebar/components/ProfileCard";
 import { AddAlumniButton } from "@/sidebar/components/AddAlumniButton";
@@ -9,7 +10,6 @@ import { AlumniList } from "@/sidebar/components/AlumniList";
 import { ExportCard } from "@/sidebar/components/ExportCard";
 import { RecentActivity } from "@/sidebar/components/RecentActivity";
 import { Toast } from "@/sidebar/components/Toast";
-import { exportCSV, exportExcel } from "@/sidebar/services/export";
 import type { useProfile } from "@/sidebar/hooks/useProfile";
 import type { useAlumni } from "@/sidebar/hooks/useAlumni";
 
@@ -30,6 +30,7 @@ export function Sidebar({
   profile,
   alumni,
 }: SidebarProps) {
+  const { export: exportService } = useServices();
   const [toast, setToast] = React.useState<{
     message: string;
     type: "success" | "error" | "warning";
@@ -114,11 +115,11 @@ export function Sidebar({
                 <ExportCard
                   count={alumni.totalCount}
                   onExportCSV={() => {
-                    exportCSV(alumni.alumni);
+                    exportService.exportCSV(alumni.alumni);
                     showToast("CSV exported!", "success");
                   }}
                   onExportExcel={() => {
-                    exportExcel(alumni.alumni);
+                    exportService.exportExcel(alumni.alumni);
                     showToast("Excel exported!", "success");
                   }}
                 />

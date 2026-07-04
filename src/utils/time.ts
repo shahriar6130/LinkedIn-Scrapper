@@ -1,8 +1,3 @@
-export function truncate(str: string, max: number): string {
-  if (!str) return "";
-  return str.length > max ? str.substring(0, max) + "..." : str;
-}
-
 export function timeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
   if (seconds < 60) return "Just now";

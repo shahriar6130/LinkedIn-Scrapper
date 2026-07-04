@@ -1,10 +1,10 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { UserPlus, Check, Loader2 } from "lucide-react";
-import type { ProfileData } from "@/shared/types";
+import type { ProfileScrapeResult } from "@/models";
 
 interface AddAlumniButtonProps {
-  profile: ProfileData | null;
+  profile: ProfileScrapeResult | null;
   loading: boolean;
   isAdded: boolean;
   onAdd: () => void;

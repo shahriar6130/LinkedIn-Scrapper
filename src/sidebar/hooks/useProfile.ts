@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import type { ProfileData } from "@/shared/types";
+import { useServices } from "@/core/container";
+import type { ProfileScrapeResult } from "@/models";
 
 export function useProfile() {
-  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const { scraper, logger } = useServices();
+  const [profile, setProfile] = useState<ProfileScrapeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,23 +13,27 @@ export function useProfile() {
     setError(null);
     setProfile(null);
 
-    chrome.runtime.sendMessage({ type: "SCRAPE_PROFILE" }, (response) => {
-      setLoading(false);
-      if (chrome.runtime.lastError) {
+    scraper
+      .scrapeProfile()
+      .then((response) => {
+        setLoading(false);
+        if (response?.error) {
+          logger.error("Profile", "Scrape error:", response.error);
+          setError(response.error);
+          return;
+        }
+        if (response?.name) {
+          setProfile(response);
+        } else {
+          setError("Could not read profile data. Make sure you're on a LinkedIn profile page.");
+        }
+      })
+      .catch((err) => {
+        setLoading(false);
+        logger.error("Profile", "Scrape failed:", err);
         setError("Could not connect to page. Try refreshing the tab.");
-        return;
-      }
-      if (response?.error) {
-        setError(response.error);
-        return;
-      }
-      if (response?.name) {
-        setProfile(response as ProfileData);
-      } else {
-        setError("Could not read profile data. Make sure you're on a LinkedIn profile page.");
-      }
-    });
-  }, []);
+      });
+  }, [scraper, logger]);
 
   // Auto-scrape on mount
   useEffect(() => {

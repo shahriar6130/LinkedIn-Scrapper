@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "@/sidebar/App";
 import "@/sidebar/styles/globals.css";
+import { MessageType } from "@/messaging";
 
 async function injectSidebar() {
   // Avoid double injection
@@ -53,7 +54,7 @@ async function injectSidebar() {
 
 // Listen for toggle messages from background
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === "TOGGLE_SIDEBAR") {
+  if (message.type === MessageType.TOGGLE_SIDEBAR) {
     window.dispatchEvent(new CustomEvent("alumni-sidebar-toggle"));
   }
 });
@@ -83,6 +84,6 @@ window.addEventListener("popstate", () => {
 });
 
 // Request MAIN world nav interception from background (avoids inline script CSP violation)
-chrome.runtime.sendMessage({ type: "INJECT_NAV_SCRIPT" });
+chrome.runtime.sendMessage({ type: MessageType.INJECT_NAV_SCRIPT });
 
 injectSidebar();

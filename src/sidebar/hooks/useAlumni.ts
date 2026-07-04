@@ -1,25 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
-import { getAlumni, saveAlumni } from "@/sidebar/services/storage";
-import type { Alumni } from "@/shared/types";
+import { useServices } from "@/core/container";
+import type { Alumni } from "@/models";
 
 export function useAlumni() {
+  const { storage } = useServices();
   const [alumni, setAlumni] = useState<Alumni[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   // Load from storage on mount
   useEffect(() => {
-    getAlumni().then((stored) => {
+    storage.getAlumni().then((stored) => {
       setAlumni(stored);
       setLoaded(true);
     });
-  }, []);
+  }, [storage]);
 
   // Persist to storage on change
   useEffect(() => {
     if (loaded) {
-      saveAlumni(alumni);
+      storage.saveAlumni(alumni);
     }
-  }, [alumni, loaded]);
+  }, [alumni, loaded, storage]);
 
   const addAlumni = useCallback(
     (data: Omit<Alumni, "addedAt">): boolean => {

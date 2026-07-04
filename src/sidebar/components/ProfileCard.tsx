@@ -1,11 +1,11 @@
 import React from "react";
 import { MapPin, Building2, GraduationCap, ExternalLink, RefreshCw } from "lucide-react";
 import { ProfileCardSkeleton } from "@/sidebar/components/ProfileCardSkeleton";
-import type { ProfileData } from "@/shared/types";
-import { truncate } from "@/sidebar/utils";
+import type { ProfileScrapeResult } from "@/models";
+import { truncate } from "@/utils";
 
 interface ProfileCardProps {
-  profile: ProfileData | null;
+  profile: ProfileScrapeResult | null;
   loading: boolean;
   error: string | null;
   onRetry: () => void;

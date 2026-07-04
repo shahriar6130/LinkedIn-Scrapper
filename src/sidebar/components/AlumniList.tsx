@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Search } from "lucide-react";
 import { AlumniCard } from "@/sidebar/components/AlumniCard";
 import { EmptyState } from "@/sidebar/components/EmptyState";
-import type { Alumni } from "@/shared/types";
+import type { Alumni } from "@/models";
 
 interface AlumniListProps {
   alumni: Alumni[];
