@@ -59,6 +59,7 @@ export class StorageService implements IStorageService {
           skills: (lead.skills as string) ?? "",
           industry: (lead.industry as string) ?? "",
           experiences: (lead.experiences as string) ?? "[]",
+          educations: (lead.educations as string) ?? "[]",
           addedAt: (lead.addedAt as number) ?? Date.now(),
         }));
 

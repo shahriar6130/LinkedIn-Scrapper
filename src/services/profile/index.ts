@@ -1,4 +1,4 @@
-import type { Profile, ProfileScrapeResult, Alumni, Experience, ExperienceScrapeData } from "@/models";
+import type { Profile, ProfileScrapeResult, Alumni, Experience, ExperienceScrapeData, Education, EducationScrapeData } from "@/models";
 import type { IProfileService } from "../interfaces";
 
 /**
@@ -13,6 +13,7 @@ export class ProfileService implements IProfileService {
     if (result.error || !result.name) return null;
 
     const experiences = this.parseExperiences(result.experiences);
+    const educations = this.parseEducations(result.educations);
     const currentExp = experiences.find((e) => e.current) ?? experiences[0] ?? null;
 
     return {
@@ -27,9 +28,12 @@ export class ProfileService implements IProfileService {
           ? {
               institute: result.educationInstitute,
               degree: result.degree,
+              field: "",
               timeline: result.educationTimeline,
+              description: "",
             }
           : null,
+      educations,
       profilePicture: result.profilePicture,
       hostedPicture: result.hostedPicture ?? "",
       connectionDegree: result.connectionDegree,
@@ -59,6 +63,7 @@ export class ProfileService implements IProfileService {
       skills: JSON.stringify(profile.skills?.map((s) => s.name) ?? []),
       industry: profile.industry ?? "",
       experiences: JSON.stringify(profile.experiences ?? []),
+      educations: JSON.stringify(profile.educations ?? []),
       addedAt: Date.now(),
     };
   }
@@ -76,6 +81,22 @@ export class ProfileService implements IProfileService {
         duration: r.duration ?? "",
         current: r.current ?? false,
         location: r.location ?? "",
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  private parseEducations(json: string | undefined): Education[] {
+    if (!json) return [];
+    try {
+      const raw: EducationScrapeData[] = JSON.parse(json);
+      return raw.map((r) => ({
+        institute: r.institute ?? "",
+        degree: r.degree ?? "",
+        field: r.field ?? "",
+        timeline: r.timeline ?? "",
+        description: r.description ?? "",
       }));
     } catch {
       return [];

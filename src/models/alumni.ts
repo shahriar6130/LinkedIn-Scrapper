@@ -15,5 +15,6 @@ export interface Alumni {
   skills: string;
   industry: string;
   experiences: string;
+  educations: string;
   addedAt: number;
 }

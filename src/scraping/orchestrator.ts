@@ -335,48 +335,106 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
     }
 
     // ================================================================
-    // Extractor 5: EducationExtractor
+    // Extractor 5: EducationExtractor (rewritten — all entries)
     // ================================================================
     {
       const r = safeRun("EducationExtractor", () => {
         const warnings: string[] = [];
-        let educationInstitute = "";
-        let degree = "";
-        let educationTimeline = "";
+        const EDUC_TIMELINE_REGEX = /\d{4}\s*[-–]\s*(?:\d{4}|Present)|(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}\s*[-–]\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}|Present))/i;
+        const DEGREE_REGEX = /Bachelor|Master|Ph\.?D|Doctor|MBA|Associate|Diploma|Certificate|B\.S\.|B\.A\.|M\.S\.|M\.A\.|BSc|MSc|BEng|MEng/i;
 
-        // Primary: Education section
+        let eduSection: Element | null = null;
         const allH2s = document.querySelectorAll("h2");
         for (const h2 of allH2s) {
           if (clean(h2.textContent) === "Education") {
-            const section = h2.parentElement?.parentElement ?? null;
-            if (section) {
-              const divs = section.querySelectorAll("div");
-              for (const item of divs) {
-                const ps = item.querySelectorAll("p");
-                if (ps.length >= 2) {
-                  const p1 = clean(ps[0].textContent);
-                  const p2 = clean(ps[1].textContent);
-                  const p3 = ps.length >= 3 ? clean(ps[2].textContent) : "";
-                  if (p1.length > 3 && p1.length < 120) educationInstitute = p1;
-                  if (p2.length > 1 && p2.length < 100 && !p2.match(/^\d{4}/)) degree = p2;
-                  if (p3 && /\d{4}/.test(p3)) educationTimeline = p3;
-                  if (educationInstitute || degree) break;
-                }
-              }
-            }
+            eduSection = h2.closest("section") ?? h2.parentElement?.parentElement?.parentElement ?? null;
             break;
           }
         }
 
-        // Fallback: structured data
-        if (!educationInstitute) {
-          warnings.push("Education section not found, trying fallback selectors");
+        if (!eduSection) {
+          // Fallback: itemprop
           const alumniEl = document.querySelector("[itemprop='alumniOf']");
-          if (alumniEl) educationInstitute = clean(alumniEl.textContent);
+          if (alumniEl) {
+            const name = clean(alumniEl.textContent);
+            if (name) {
+              return {
+                data: { educations: JSON.stringify([{ institute: name, degree: "", field: "", timeline: "", description: "" }]) },
+                warnings,
+                errors: [],
+              };
+            }
+          }
+          warnings.push("Education section not found");
+          return { data: { educations: "[]" }, warnings, errors: [] };
         }
 
-        if (!educationInstitute && !degree) warnings.push("No education data found");
-        return { data: { educationInstitute, degree, educationTimeline }, warnings, errors: [] };
+        const educations: Array<{ institute: string; degree: string; field: string; timeline: string; description: string }> = [];
+        const items = eduSection.querySelectorAll("li");
+
+        for (const li of items) {
+          const allText = clean(li.textContent);
+          if (!allText || allText.length < 3) continue;
+
+          const spans = li.querySelectorAll("span, p");
+          if (spans.length < 1) continue;
+
+          let institute = "";
+          let degree = "";
+          let field = "";
+          let timeline = "";
+          let description = "";
+
+          for (let i = 0; i < spans.length; i++) {
+            const t = clean(spans[i].textContent);
+
+            // Institution: first short text without degree/timeline keywords
+            if (
+              !institute &&
+              t.length > 2 && t.length < 150 &&
+              !t.includes("·") &&
+              !DEGREE_REGEX.test(t) &&
+              !EDUC_TIMELINE_REGEX.test(t)
+            ) {
+              institute = t;
+              continue;
+            }
+
+            // Degree line: may contain "Degree, Field" or "Degree · Field"
+            if (!degree && DEGREE_REGEX.test(t)) {
+              const parts = t.split(/\s*[·•,]\s*/);
+              degree = parts[0].trim();
+              if (parts.length >= 2) {
+                field = parts.slice(1).join(", ").trim();
+              }
+              continue;
+            }
+
+            // Timeline
+            if (!timeline && EDUC_TIMELINE_REGEX.test(t)) {
+              timeline = t;
+              continue;
+            }
+
+            // Description: longer text after all metadata
+            if (
+              !description &&
+              t.length > 20 && t.length < 500 &&
+              institute &&
+              !DEGREE_REGEX.test(t) &&
+              !EDUC_TIMELINE_REGEX.test(t)
+            ) {
+              description = t;
+            }
+          }
+
+          if (institute || degree) {
+            educations.push({ institute, degree, field, timeline, description });
+          }
+        }
+
+        if (educations.length === 0) warnings.push("Education section found but no entries extracted");
+        return { data: { educations: JSON.stringify(educations) }, warnings, errors: [] };
       });
       Object.assign(data, r.data);
       allWarnings.push(...r.warnings);
@@ -654,6 +712,8 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
     let parsedExperiences: Array<Record<string, string | boolean>> = [];
     try { parsedExperiences = JSON.parse(experiencesJson); } catch { parsedExperiences = []; }
 
+    const educationsJson = (data.educations as string) ?? "[]";
+
     // Backward compat: first experience provides designation/companyName
     const firstExp = parsedExperiences[0] ?? {};
     const designation = (data.designation as string) ?? (data.headline as string) ?? ((firstExp.title as string) ?? "");
@@ -674,6 +734,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
       skills: (data.skills as string[]) ?? [],
       industry: (data.industry as string) ?? "",
       experiences: experiencesJson,
+      educations: educationsJson,
       warnings: allWarnings,
       errors: allErrors,
       timing: performance.now() - totalStart,
