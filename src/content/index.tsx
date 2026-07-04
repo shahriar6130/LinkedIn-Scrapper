@@ -31,13 +31,19 @@ async function injectSidebar() {
   `;
   shadow.appendChild(resetStyle);
 
-  // Fetch and inject the built CSS (Tailwind + globals) into shadow DOM
+  // CRXJS auto-injects CSS at page level via manifest.
+  // For Shadow DOM isolation, fetch the CSS from web_accessible_resources.
   try {
-    const cssUrl = chrome.runtime.getURL("assets/content.css");
-    const cssText = await fetch(cssUrl).then((r) => r.text());
-    const styleEl = document.createElement("style");
-    styleEl.textContent = cssText;
-    shadow.appendChild(styleEl);
+    const manifest = chrome.runtime.getManifest();
+    const cssFiles =
+      manifest.content_scripts?.[0]?.css ?? [];
+    for (const cssFile of cssFiles) {
+      const cssUrl = chrome.runtime.getURL(cssFile);
+      const cssText = await fetch(cssUrl).then((r) => r.text());
+      const styleEl = document.createElement("style");
+      styleEl.textContent = cssText;
+      shadow.appendChild(styleEl);
+    }
   } catch (e) {
     console.error("[Alumni Sidebar] Failed to load CSS:", e);
   }

@@ -16,7 +16,9 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@crxjs/vite-plugin": "^2.7.1",
     "@types/chrome": "^0.0.287",
+    "@types/node": "^26.1.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
