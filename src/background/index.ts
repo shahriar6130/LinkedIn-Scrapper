@@ -1,6 +1,7 @@
 import { MessageType } from "@/messaging";
 import { LoggerService } from "@/services/logger";
 import { buildProfileScraper } from "@/scraping/orchestrator";
+import { buildPageLoader } from "@/scraping/page-loader";
 
 const logger = new LoggerService();
 const TAG = "BG";
@@ -47,14 +48,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ error: "No active tab found" });
         return;
       }
+      const tabId = tab.id;
+
+      // Step 1: Run intelligent page loader first
       chrome.scripting
         .executeScript({
-          target: { tabId: tab.id },
+          target: { tabId },
           world: "MAIN" as const,
-          func: buildProfileScraper(),
+          func: buildPageLoader(),
         })
-        .then((results) => {
-          const result = results?.[0]?.result;
+        .then((loadResults) => {
+          const loadResult = loadResults?.[0]?.result;
+
+          if (loadResult?.navigationChanged) {
+            logger.info(TAG, "Navigation changed during page load, aborting scrape");
+            sendResponse({ error: "Page navigation changed during loading. Try again." });
+            return;
+          }
+
+          if (loadResult?.warnings?.length) {
+            logger.info(TAG, "Page loader:", loadResult.warnings);
+          }
+          logger.info(TAG, `Page loaded in ${loadResult?.timing?.toFixed(1) ?? "?"}ms, expanded ${loadResult?.expandedSections?.length ?? 0} section(s)`);
+
+          // Step 2: Run the scraper on the now-expanded page
+          return chrome.scripting.executeScript({
+            target: { tabId },
+            world: "MAIN" as const,
+            func: buildProfileScraper(),
+          });
+        })
+        .then((scrapeResults) => {
+          if (!scrapeResults) return; // navigation changed case
+          const result = scrapeResults?.[0]?.result;
           if (result?.errors?.length) {
             logger.error(TAG, "Scrape errors:", result.errors);
           }
