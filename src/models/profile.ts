@@ -14,6 +14,9 @@ export interface Profile {
   profilePicture: string;
   hostedPicture: string;
   connectionDegree: string;
+  followers: string;
+  connections: string;
+  languages: string[];
   about: string;
   skills: Skill[];
   industry: string;
@@ -32,6 +35,9 @@ export interface ProfileScrapeResult {
   profilePicture: string;
   hostedPicture?: string;
   connectionDegree: string;
+  followers: string;
+  connections: string;
+  languages: string[];
   about: string;
   skills: string[];
   industry: string;

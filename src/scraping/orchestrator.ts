@@ -706,6 +706,106 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
     }
 
     // ================================================================
+    // Extractor 11: Followers + Connections Extractor
+    // ================================================================
+    {
+      const r = safeRun("FollowersConnectionsExtractor", () => {
+        const warnings: string[] = [];
+        let followers = "";
+        let connections = "";
+
+        const FOLLOWER_REGEX = /([\d,]+)\+?\s*followers?/i;
+        const CONNECTION_REGEX = /([\d,]+)\+?\s*connections?/i;
+
+        const headerArea = document.querySelector("main") ?? document;
+        const candidates = headerArea.querySelectorAll("span, p, a, div");
+
+        for (const el of candidates) {
+          const t = clean(el.textContent);
+          if (!t || t.length > 80) continue;
+
+          if (!followers) {
+            const m = t.match(FOLLOWER_REGEX);
+            if (m) followers = m[0];
+          }
+
+          if (!connections) {
+            const m = t.match(CONNECTION_REGEX);
+            if (m) connections = m[0];
+          }
+
+          if (followers && connections) break;
+        }
+
+        if (!followers) warnings.push("No followers count found");
+        if (!connections) warnings.push("No connections count found");
+        return { data: { followers, connections }, warnings, errors: [] };
+      });
+      Object.assign(data, r.data);
+      allWarnings.push(...r.warnings);
+      allErrors.push(...r.errors);
+    }
+
+    // ================================================================
+    // Extractor 12: Languages Extractor
+    // ================================================================
+    {
+      const r = safeRun("LanguagesExtractor", () => {
+        const warnings: string[] = [];
+        const languages: string[] = [];
+
+        let langSection: Element | null = null;
+        const allH2s = document.querySelectorAll("h2, h3");
+        for (const h of allH2s) {
+          if (clean(h.textContent) === "Languages") {
+            langSection = h.closest("section") ?? h.parentElement?.parentElement ?? null;
+            break;
+          }
+        }
+
+        if (!langSection) {
+          // Fallback: structured data
+          const langEls = document.querySelectorAll("[itemprop='knowsLanguage']");
+          for (const el of langEls) {
+            const t = clean(el.textContent);
+            if (t && t.length > 1 && t.length < 60 && !languages.includes(t)) {
+              languages.push(t);
+            }
+          }
+          if (languages.length === 0) warnings.push("Languages section not found");
+          return { data: { languages }, warnings, errors: [] };
+        }
+
+        const items = langSection.querySelectorAll("li, span, p");
+        for (const el of items) {
+          const t = clean(el.textContent);
+          if (!t || t.length < 2 || t.length > 80) continue;
+          if (t === "Languages") continue;
+
+          const langName = t
+            .replace(/\s*[-–—]\s*(Native|Professional|Elementary|Limited|Intermediate|Fluent|Beginner).*$/i, "")
+            .replace(/\s*\((Native|Professional|Elementary|Limited|Intermediate|Fluent|Beginner).*$/i, ")")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          if (
+            langName.length > 1 && langName.length < 40 &&
+            !languages.includes(langName) &&
+            !/^(Native|Professional|Elementary|Limited|Intermediate|Fluent|Beginner)/i.test(langName)
+          ) {
+            languages.push(langName);
+          }
+        }
+
+        if (languages.length === 0) warnings.push("Languages section found but no entries extracted");
+        return { data: { languages }, warnings, errors: [] };
+      });
+      Object.assign(data, r.data);
+      allWarnings.push(...r.warnings);
+      allErrors.push(...r.errors);
+    }
+
+    // ================================================================
     // Normalize into flat ProfileScrapeResult
     // ================================================================
     const experiencesJson = (data.experiences as string) ?? "[]";
@@ -730,6 +830,9 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
       educationTimeline: (data.educationTimeline as string) ?? "",
       profilePicture: (data.profilePicture as string) ?? "",
       connectionDegree: (data.connectionDegree as string) ?? "",
+      followers: (data.followers as string) ?? "",
+      connections: (data.connections as string) ?? "",
+      languages: (data.languages as string[]) ?? [],
       about: (data.about as string) ?? "",
       skills: (data.skills as string[]) ?? [],
       industry: (data.industry as string) ?? "",

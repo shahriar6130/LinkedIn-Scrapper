@@ -11,6 +11,9 @@ export interface Alumni {
   profilePicture: string;
   hostedPicture: string;
   connectionDegree: string;
+  followers: string;
+  connections: string;
+  languages: string;
   about: string;
   skills: string;
   industry: string;
