@@ -1,4 +1,4 @@
-export type { Experience } from "./experience";
+export type { Experience, ExperienceScrapeData } from "./experience";
 export type { Education } from "./education";
 export type { Skill } from "./skill";
 export type { Profile, ProfileScrapeResult } from "./profile";

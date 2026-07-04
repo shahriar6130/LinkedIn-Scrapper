@@ -6,6 +6,7 @@ export interface Profile {
   name: string;
   headline: string;
   currentExperience: Experience | null;
+  experiences: Experience[];
   profileLink: string;
   location: string;
   education: Education | null;
@@ -33,5 +34,6 @@ export interface ProfileScrapeResult {
   about: string;
   skills: string[];
   industry: string;
+  experiences: string; // JSON-encoded ExperienceScrapeData[]
   error?: string;
 }

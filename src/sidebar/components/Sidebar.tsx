@@ -58,6 +58,7 @@ export function Sidebar({
       about: p.about ?? "",
       skills: JSON.stringify(p.skills ?? []),
       industry: p.industry ?? "",
+      experiences: p.experiences ?? "[]",
     });
     if (success) {
       showToast(`${profile.profile.name} added!`, "success");

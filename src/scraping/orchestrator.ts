@@ -229,61 +229,105 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
     }
 
     // ================================================================
-    // Extractor 4: ExperienceExtractor
+    // Extractor 4: ExperienceExtractor (full rewrite)
     // ================================================================
     {
       const r = safeRun("ExperienceExtractor", () => {
         const warnings: string[] = [];
-        let designation = "";
-        let companyName = "";
 
-        // Primary: Experience section
-        const allH2s = document.querySelectorAll("h2");
-        for (const h2 of allH2s) {
+        const EMPLOYMENT_REGEX = /(?:Full-time|Part-time|Contract|Temporary|Freelance|Self-employed|Internship|Apprenticeship|Seasonal)/i;
+        const DATE_REGEX = /(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}\s*[-–]\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}|Present))|(?:\d{4}\s*[-–]\s*(?:\d{4}|Present))/i;
+
+        function parseMeta(text: string): { start: string; end: string; duration: string; employmentType: string } {
+          let start = "", end = "", duration = "", employmentType = "";
+          const empMatch = text.match(EMPLOYMENT_REGEX);
+          if (empMatch) employmentType = empMatch[0];
+          const durMatch = text.match(/\d+\s+(?:yr|year|mo|month)s?[^\d]*?\d*\s*(?:mos?)?/i);
+          if (durMatch) duration = durMatch[0].trim();
+          const dateMatch = text.match(DATE_REGEX);
+          if (dateMatch) {
+            const parts = dateMatch[0].split(/\s*[-–]\s*/);
+            if (parts.length === 2) { start = parts[0].trim(); end = parts[1].trim(); }
+            else { start = dateMatch[0].trim(); }
+          }
+          return { start, end, duration, employmentType };
+        }
+
+        const experiences: Array<Record<string, string | boolean>> = [];
+
+        // Find Experience section
+        let expSection: Element | null = null;
+        const h2s = document.querySelectorAll("h2");
+        for (const h2 of h2s) {
           if (clean(h2.textContent) === "Experience") {
-            const section = h2.parentElement?.parentElement ?? null;
-            if (section) {
-              const divs = section.querySelectorAll("div");
-              for (const item of divs) {
-                const ps = item.querySelectorAll("p");
-                if (ps.length >= 2) {
-                  const p1 = clean(ps[0].textContent);
-                  const p2 = clean(ps[1].textContent);
-                  if (p1.length > 1 && p1.length < 100 && !p1.includes("\u00B7")) designation = p1;
-                  if (p2.length > 1 && p2.length < 100) {
-                    const dotMatch = p2.match(/^(.+?)\s*[\u00B7\u2022]\s*(.+)$/);
-                    companyName = dotMatch ? dotMatch[1].trim() : p2;
-                  }
-                  if (designation || companyName) break;
-                }
-              }
-            }
+            expSection = h2.closest("section") ?? h2.parentElement?.parentElement?.parentElement ?? null;
             break;
           }
         }
 
-        // Fallback for designation
-        if (!designation && nameEl) {
-          warnings.push("Experience section not found, using headline area fallback");
-          let container = nameEl.parentElement;
-          for (let depth = 0; depth < 5 && container; depth++) {
-            const ps = container.querySelectorAll(":scope > p");
-            for (const p of ps) {
-              const t = clean(p.textContent);
-              if (t.length > 5 && t.length < 150 &&
-                  !t.includes("followers") && !t.includes("connections") &&
-                  !/^·?\s*(1st|2nd|3rd|[4-9]th)\s*$/i.test(t) && !t.includes(", ")) {
-                designation = t;
-                break;
-              }
+        if (!expSection) {
+          warnings.push("Experience section not found");
+          return { data: { experiences: "[]" }, warnings, errors: [] };
+        }
+
+        const items = expSection.querySelectorAll("li");
+        for (const li of items) {
+          const allText = clean(li.textContent);
+          if (!allText || allText.length < 5) continue;
+
+          const spans = li.querySelectorAll("span, p");
+          if (spans.length < 2) continue;
+
+          let title = "", company = "", metaText = "", location = "";
+
+          for (let i = 0; i < spans.length; i++) {
+            const t = clean(spans[i].textContent);
+
+            if (!title && t.length > 1 && t.length < 120 && !t.includes("\u00B7") && !EMPLOYMENT_REGEX.test(t) && !DATE_REGEX.test(t) && !/^\d+\s+(yr|mo)/i.test(t)) {
+              title = t;
+              continue;
             }
-            if (designation) break;
-            container = container.parentElement;
+
+            if (title && !company && t.length > 1 && t.length < 120) {
+              const dotMatch = t.match(/^(.+?)\s*[\u00B7\u2022]\s*(.+)$/);
+              if (dotMatch) {
+                company = dotMatch[1].trim();
+                metaText = dotMatch[2].trim();
+              } else if (!DATE_REGEX.test(t) && !EMPLOYMENT_REGEX.test(t) && !/^\d+\s+(yr|mo)/i.test(t) && !t.includes(",")) {
+                company = t;
+              }
+              continue;
+            }
+
+            if (!metaText && (DATE_REGEX.test(t) || EMPLOYMENT_REGEX.test(t))) {
+              metaText = t;
+              continue;
+            }
+
+            if (!location && (t.includes(",") || /remote|hybrid/i.test(t)) && t.length < 80 && !DATE_REGEX.test(t) && !EMPLOYMENT_REGEX.test(t)) {
+              location = t;
+            }
+          }
+
+          const meta = parseMeta(metaText);
+          const isCurrent = /present/i.test(meta.end) || !meta.end;
+
+          if (title || company) {
+            experiences.push({
+              title,
+              company,
+              employmentType: meta.employmentType,
+              start: meta.start,
+              end: meta.end,
+              duration: meta.duration,
+              current: isCurrent,
+              location,
+            });
           }
         }
 
-        if (!designation && !companyName) warnings.push("No experience data found");
-        return { data: { designation, companyName }, warnings, errors: [] };
+        if (experiences.length === 0) warnings.push("Experience section found but no entries extracted");
+        return { data: { experiences: JSON.stringify(experiences) }, warnings, errors: [] };
       });
       Object.assign(data, r.data);
       allWarnings.push(...r.warnings);
@@ -606,10 +650,19 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
     // ================================================================
     // Normalize into flat ProfileScrapeResult
     // ================================================================
+    const experiencesJson = (data.experiences as string) ?? "[]";
+    let parsedExperiences: Array<Record<string, string | boolean>> = [];
+    try { parsedExperiences = JSON.parse(experiencesJson); } catch { parsedExperiences = []; }
+
+    // Backward compat: first experience provides designation/companyName
+    const firstExp = parsedExperiences[0] ?? {};
+    const designation = (data.designation as string) ?? (data.headline as string) ?? ((firstExp.title as string) ?? "");
+    const companyName = (data.companyName as string) ?? ((firstExp.company as string) ?? "");
+
     return {
       name: (data.name as string) ?? "",
-      designation: (data.designation as string) ?? (data.headline as string) ?? "",
-      companyName: (data.companyName as string) ?? "",
+      designation,
+      companyName,
       profileLink: (data.profileLink as string) ?? "",
       location: (data.location as string) ?? "",
       educationInstitute: (data.educationInstitute as string) ?? "",
@@ -620,6 +673,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
       about: (data.about as string) ?? "",
       skills: (data.skills as string[]) ?? [],
       industry: (data.industry as string) ?? "",
+      experiences: experiencesJson,
       warnings: allWarnings,
       errors: allErrors,
       timing: performance.now() - totalStart,

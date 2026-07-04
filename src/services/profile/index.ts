@@ -1,4 +1,4 @@
-import type { Profile, ProfileScrapeResult, Alumni } from "@/models";
+import type { Profile, ProfileScrapeResult, Alumni, Experience, ExperienceScrapeData } from "@/models";
 import type { IProfileService } from "../interfaces";
 
 /**
@@ -12,13 +12,14 @@ export class ProfileService implements IProfileService {
   toProfile(result: ProfileScrapeResult): Profile | null {
     if (result.error || !result.name) return null;
 
+    const experiences = this.parseExperiences(result.experiences);
+    const currentExp = experiences.find((e) => e.current) ?? experiences[0] ?? null;
+
     return {
       name: result.name,
       headline: result.designation,
-      currentExperience:
-        result.designation || result.companyName
-          ? { title: result.designation, company: result.companyName }
-          : null,
+      currentExperience: currentExp,
+      experiences,
       profileLink: result.profileLink,
       location: result.location,
       education:
@@ -57,7 +58,27 @@ export class ProfileService implements IProfileService {
       about: profile.about ?? "",
       skills: JSON.stringify(profile.skills?.map((s) => s.name) ?? []),
       industry: profile.industry ?? "",
+      experiences: JSON.stringify(profile.experiences ?? []),
       addedAt: Date.now(),
     };
+  }
+
+  private parseExperiences(json: string | undefined): Experience[] {
+    if (!json) return [];
+    try {
+      const raw: ExperienceScrapeData[] = JSON.parse(json);
+      return raw.map((r) => ({
+        title: r.title ?? "",
+        company: r.company ?? "",
+        employmentType: r.employmentType ?? "",
+        start: r.start ?? "",
+        end: r.end ?? "",
+        duration: r.duration ?? "",
+        current: r.current ?? false,
+        location: r.location ?? "",
+      }));
+    } catch {
+      return [];
+    }
   }
 }
