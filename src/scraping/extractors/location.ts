@@ -22,18 +22,19 @@ export const extractLocation: ExtractorFn<LocationData> = (
     // --- Primary: walk up from nameEl for location-pattern text ---
     if (ctx.nameEl) {
       let container = ctx.nameEl.parentElement;
-      for (let depth = 0; depth < 5 && container; depth++) {
-        const ps = container.querySelectorAll(":scope > p");
+      for (let depth = 0; depth < 8 && container; depth++) {
+        const ps = container.querySelectorAll(":scope > p, :scope > span, :scope > div > span, :scope > div > p");
         for (const p of ps) {
           const t = (p.textContent ?? "").trim().replace(/\s+/g, " ");
           if (
             t &&
             t.length > 3 &&
-            t.length < 60 &&
-            (t.includes(", ") || /city|country|region|division/i.test(t)) &&
+            t.length < 80 &&
+            (t.includes(", ") || /city|country|region|division|united states|kingdom|india|canada|australia/i.test(t)) &&
             !t.includes("followers") &&
             !t.includes("connections") &&
-            !/^·?\s*(1st|2nd|3rd|[4-9]th)\s*$/i.test(t)
+            !/^·?\s*(1st|2nd|3rd|[4-9]th)\s*$/i.test(t) &&
+            !/\d{4}\s*[-–]/.test(t) // skip timeline patterns
           ) {
             location = t;
             break;
@@ -48,10 +49,38 @@ export const extractLocation: ExtractorFn<LocationData> = (
     if (!location) {
       warnings.push("Location not found near nameEl, trying classic selectors");
       const classicEl = ctx.root.querySelector(
-        ".text-body-small.inline, [itemprop='address'], .profile-info-subheader > span"
+        ".text-body-small.inline, [itemprop='address'], .profile-info-subheader > span, .pv-top-card--list li span"
       );
       if (classicEl) {
-        location = (classicEl.textContent ?? "").trim().replace(/\s+/g, " ");
+        const t = (classicEl.textContent ?? "").trim().replace(/\s+/g, " ");
+        if (t.includes(", ") || /city|country|region/i.test(t)) {
+          location = t;
+        }
+      }
+    }
+
+    // --- Fallback 2: look for location-like text near profile header ---
+    if (!location) {
+      warnings.push("Classic selectors failed, trying header area search");
+      const headerArea = ctx.root.querySelector(".pv-top-card, main > div > div:first-child");
+      if (headerArea) {
+        const allText = headerArea.querySelectorAll("span, p");
+        for (const el of allText) {
+          const t = (el.textContent ?? "").trim().replace(/\s+/g, " ");
+          if (
+            t &&
+            t.length > 5 &&
+            t.length < 80 &&
+            t.includes(", ") &&
+            !t.includes("followers") &&
+            !t.includes("connections") &&
+            !/\d{4}\s*[-–]/.test(t) &&
+            /[A-Z][a-z]+,\s*[A-Z]/.test(t) // matches "City, State" pattern
+          ) {
+            location = t;
+            break;
+          }
+        }
       }
     }
 

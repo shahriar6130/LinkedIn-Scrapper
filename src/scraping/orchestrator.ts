@@ -58,6 +58,25 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
     const totalStart = performance.now();
     const data: Record<string, string | string[]> = {};
 
+    // Helper: check if element is inside our sidebar (to avoid scraping our own UI)
+    const sidebarRoot = document.getElementById("alumni-sidebar-root");
+    function isInsideSidebar(el: Element | null): boolean {
+      if (!sidebarRoot || !el) return false;
+      return sidebarRoot.contains(el);
+    }
+
+    // Helper: querySelector that excludes sidebar elements
+    function querySafe(selector: string): Element | null {
+      const el = document.querySelector(selector);
+      return isInsideSidebar(el) ? null : el;
+    }
+
+    // Helper: querySelectorAll that excludes sidebar elements
+    function queryAllSafe(selector: string): NodeListOf<Element> | Element[] {
+      const all = document.querySelectorAll(selector);
+      return Array.from(all).filter((el) => !isInsideSidebar(el));
+    }
+
     // ================================================================
     // Extractor 1: ProfileExtractor (name + profileLink)
     // ================================================================
@@ -68,7 +87,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         let name = "";
 
         // Primary: h1
-        const h1 = document.querySelector("h1");
+        const h1 = querySafe("h1");
         if (h1) {
           const text = clean(h1.textContent);
           if (text.length > 2 && text.length < 60 && !text.includes("notification")) {
@@ -79,7 +98,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         // Fallback: h2 with name heuristics
         if (!name) {
           warnings.push("h1 not found, falling back to h2 scan");
-          const h2s = document.querySelectorAll("h2");
+          const h2s = queryAllSafe("h2");
           for (const h2 of h2s) {
             const text = clean(h2.textContent);
             if (
@@ -133,26 +152,28 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         let headline = "";
 
         // Primary: known selectors
-        const primary = document.querySelector(
-          ".text-body-medium.break-words, .display-flex .text-body-medium"
+        const primary = querySafe(
+          ".text-body-medium.break-words, .display-flex .text-body-medium, [data-generated-suggestion-target] .text-body-medium, h2 + div .text-body-medium, .pv-top-card--list li .text-body-medium"
         );
         if (primary) {
           const text = clean(primary.textContent);
           if (text.length > 2 && text.length < 200) headline = text;
         }
 
-        // Fallback: walk up from nameEl
+        // Fallback 1: walk up from nameEl for first qualifying <p> or <span>
         if (!headline && nameEl) {
           warnings.push("Primary headline selectors not found, using fallback");
           let container = nameEl.parentElement;
-          for (let depth = 0; depth < 5 && container; depth++) {
-            const ps = container.querySelectorAll(":scope > p");
-            for (const p of ps) {
-              const t = clean(p.textContent);
+          for (let depth = 0; depth < 8 && container; depth++) {
+            const children = container.querySelectorAll(":scope > p, :scope > span, :scope > div > span, :scope > div > p");
+            for (const child of children) {
+              const t = clean(child.textContent);
               if (
                 t.length > 5 && t.length < 200 &&
                 !t.includes("followers") && !t.includes("connections") &&
-                !/^·?\s*(1st|2nd|3rd|[4-9]th)\s*$/i.test(t) && !t.includes(", ")
+                !/^·?\s*(1st|2nd|3rd|[4-9]th)\s*$/i.test(t) &&
+                !/^\d+\s*\.?\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(t) &&
+                !/\d{4}\s*[-–]/.test(t)
               ) {
                 headline = t;
                 break;
@@ -160,6 +181,27 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
             }
             if (headline) break;
             container = container.parentElement;
+          }
+        }
+
+        // Fallback 2: look for text after name in common structures
+        if (!headline) {
+          warnings.push("Headline fallback 1 failed, trying structure-based search");
+          const nameParent = nameEl?.parentElement;
+          if (nameParent) {
+            const siblings = nameParent.querySelectorAll("span, p, div");
+            for (const sib of siblings) {
+              const t = clean(sib.textContent);
+              if (
+                t.length > 10 && t.length < 200 &&
+                !t.includes("followers") && !t.includes("connections") &&
+                !/\d{4}\s*[-–]/.test(t) &&
+                !/^\s*[·•]\s*$/.test(t)
+              ) {
+                headline = t;
+                break;
+              }
+            }
           }
         }
 
@@ -183,12 +225,13 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         if (nameEl) {
           let card: Element | null = nameEl;
           for (let d = 0; d < 6 && card; d++) {
-            const imgs = card.querySelectorAll("img[src*='profile-displayphoto']");
+            const imgs = card.querySelectorAll("img[src*='profile-displayphoto'], img[data-delayed-url*='profile-displayphoto']");
             for (const img of imgs) {
+              if (isInsideSidebar(img)) continue;
               const el = img as HTMLImageElement;
-              if (el.src && !el.src.includes("emoji") &&
-                  (el.naturalWidth || 0) >= 150 && (el.naturalHeight || 0) >= 150) {
-                profilePicture = el.src;
+              const src = el.src || el.getAttribute("data-delayed-url") || "";
+              if (src && !src.includes("emoji") && src.includes("profile-displayphoto")) {
+                profilePicture = src;
                 break;
               }
             }
@@ -200,14 +243,15 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         // Fallback: largest on page
         if (!profilePicture) {
           warnings.push("No profile image near nameEl, scanning entire page");
-          const allImgs = document.querySelectorAll("img[src*='profile-displayphoto']");
+          const allImgs = queryAllSafe("img[src*='profile-displayphoto'], img[data-delayed-url*='profile-displayphoto']");
           let bestSrc = "";
           let bestArea = 0;
           for (const img of allImgs) {
             const el = img as HTMLImageElement;
-            if (el.src && !el.src.includes("emoji")) {
-              const area = (el.naturalWidth || 0) * (el.naturalHeight || 0);
-              if (area > bestArea && area > 10000) { bestArea = area; bestSrc = el.src; }
+            const src = el.src || el.getAttribute("data-delayed-url") || "";
+            if (src && !src.includes("emoji") && src.includes("profile-displayphoto")) {
+              const area = (el.naturalWidth || 400) * (el.naturalHeight || 400);
+              if (area > bestArea) { bestArea = area; bestSrc = src; }
             }
           }
           if (bestSrc) profilePicture = bestSrc;
@@ -257,7 +301,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
 
         // Find Experience section
         let expSection: Element | null = null;
-        const h2s = document.querySelectorAll("h2");
+        const h2s = queryAllSafe("h2");
         for (const h2 of h2s) {
           if (clean(h2.textContent) === "Experience") {
             expSection = h2.closest("section") ?? h2.parentElement?.parentElement?.parentElement ?? null;
@@ -344,7 +388,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         const DEGREE_REGEX = /Bachelor|Master|Ph\.?D|Doctor|MBA|Associate|Diploma|Certificate|B\.S\.|B\.A\.|M\.S\.|M\.A\.|BSc|MSc|BEng|MEng/i;
 
         let eduSection: Element | null = null;
-        const allH2s = document.querySelectorAll("h2");
+        const allH2s = queryAllSafe("h2");
         for (const h2 of allH2s) {
           if (clean(h2.textContent) === "Education") {
             eduSection = h2.closest("section") ?? h2.parentElement?.parentElement?.parentElement ?? null;
@@ -354,7 +398,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
 
         if (!eduSection) {
           // Fallback: itemprop
-          const alumniEl = document.querySelector("[itemprop='alumniOf']");
+          const alumniEl = querySafe("[itemprop='alumniOf']");
           if (alumniEl) {
             const name = clean(alumniEl.textContent);
             if (name) {
@@ -452,14 +496,15 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         // Primary: walk up from nameEl
         if (nameEl) {
           let container = nameEl.parentElement;
-          for (let depth = 0; depth < 5 && container; depth++) {
-            const ps = container.querySelectorAll(":scope > p");
+          for (let depth = 0; depth < 8 && container; depth++) {
+            const ps = container.querySelectorAll(":scope > p, :scope > span, :scope > div > span, :scope > div > p");
             for (const p of ps) {
               const t = clean(p.textContent);
-              if (t.length > 3 && t.length < 60 &&
-                  (t.includes(", ") || /city|country|region|division/i.test(t)) &&
+              if (t.length > 3 && t.length < 80 &&
+                  (t.includes(", ") || /city|country|region|division|united states|kingdom|india|canada|australia/i.test(t)) &&
                   !t.includes("followers") && !t.includes("connections") &&
-                  !/^·?\s*(1st|2nd|3rd|[4-9]th)\s*$/i.test(t)) {
+                  !/^·?\s*(1st|2nd|3rd|[4-9]th)\s*$/i.test(t) &&
+                  !/\d{4}\s*[-–]/.test(t)) {
                 location = t;
                 break;
               }
@@ -469,13 +514,40 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
           }
         }
 
-        // Fallback: classic selectors
+        // Fallback 1: classic selectors
         if (!location) {
           warnings.push("Location not found near nameEl, trying classic selectors");
-          const el = document.querySelector(
-            ".text-body-small.inline, [itemprop='address'], .profile-info-subheader > span"
+          const el = querySafe(
+            ".text-body-small.inline, [itemprop='address'], .profile-info-subheader > span, .pv-top-card--list li span"
           );
-          if (el) location = clean(el.textContent);
+          if (el) {
+            const t = clean(el.textContent);
+            if (t.includes(", ") || /city|country|region/i.test(t)) {
+              location = t;
+            }
+          }
+        }
+
+        // Fallback 2: look for location-like text near profile header
+        if (!location) {
+          warnings.push("Classic selectors failed, trying header area search");
+          const headerArea = querySafe(".pv-top-card, main > div > div:first-child");
+          if (headerArea) {
+            const allText = headerArea.querySelectorAll("span, p");
+            for (const el of allText) {
+              const t = clean(el.textContent);
+              if (
+                t.length > 5 && t.length < 80 &&
+                t.includes(", ") &&
+                !t.includes("followers") && !t.includes("connections") &&
+                !/\d{4}\s*[-–]/.test(t) &&
+                /[A-Z][a-z]+,\s*[A-Z]/.test(t)
+              ) {
+                location = t;
+                break;
+              }
+            }
+          }
         }
 
         if (!location) warnings.push("No location found");
@@ -495,13 +567,13 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         let about = "";
 
         // Primary: classic about section
-        const aboutEl = document.querySelector(".pv-about-section .pv-about__summary-text, .pv-about__summary-text");
+        const aboutEl = querySafe(".pv-about-section .pv-about__summary-text, .pv-about__summary-text");
         if (aboutEl) about = clean(aboutEl.textContent);
 
         // Fallback 1: #about anchor
         if (!about) {
           warnings.push("Primary about selectors not found, trying #about anchor");
-          const anchor = document.querySelector("#about");
+          const anchor = querySafe("#about");
           if (anchor) {
             const section = anchor.closest("section") ?? anchor.parentElement?.parentElement;
             if (section) {
@@ -517,7 +589,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         // Fallback 2: "About" h2 section
         if (!about) {
           warnings.push("#about anchor not found, trying h2 section");
-          const headings = document.querySelectorAll("h2, h3");
+          const headings = queryAllSafe("h2, h3");
           for (const h of headings) {
             if (clean(h.textContent) === "About") {
               const section = h.parentElement?.parentElement ?? h.parentElement ?? null;
@@ -550,7 +622,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         const skills: string[] = [];
 
         // Primary: skill entity spans
-        const skillEls = document.querySelectorAll(
+        const skillEls = queryAllSafe(
           ".pv-skill-category-entity__name span, .pv-skill-category-entity__name-text"
         );
         for (const el of skillEls) {
@@ -562,7 +634,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         // Fallback 1: skill topic buttons
         if (skills.length === 0) {
           warnings.push("Primary skill selectors not found, trying button fallback");
-          const buttons = document.querySelectorAll(
+          const buttons = queryAllSafe(
             "button[data-field='skill_card_skill_topic'] span, button[data-field*='skill'] span"
           );
           for (const btn of buttons) {
@@ -575,7 +647,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         // Fallback 2: Skills h2 section
         if (skills.length === 0) {
           warnings.push("Skill buttons not found, trying Skills h2 section");
-          const headings = document.querySelectorAll("h2, h3");
+          const headings = queryAllSafe("h2, h3");
           for (const h of headings) {
             if (clean(h.textContent) === "Skills") {
               const section = h.parentElement?.parentElement ?? h.parentElement ?? null;
@@ -609,7 +681,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         let industry = "";
 
         // Primary: classic selectors
-        const el = document.querySelector(
+        const el = querySafe(
           ".pv-top-card--industry, [data-field='industry'], .text-body-small [data-field*='industry']"
         );
         if (el) industry = clean(el.textContent);
@@ -636,7 +708,7 @@ export function buildProfileScraper(): () => ProfileScrapeResult & {
         // Fallback 2: label-based
         if (!industry) {
           warnings.push("Header area fallback failed, trying label-based search");
-          const allEls = document.querySelectorAll("span, p, div");
+          const allEls = queryAllSafe("span, p, div");
           for (const e of allEls) {
             if (clean(e.textContent) === "Industry") {
               const next = e.nextElementSibling ?? e.parentElement?.querySelector(":scope > span:last-child");
